@@ -12,9 +12,14 @@ String GPS_Cv_F_S_Longitud( float,int=10,int=6,boolean=false);
 char aux_str[50];
 int respuesta;
 char direccion[300];
-String latitud,longitud;
+String latitud="";
+String longitud="";
+String direccion1;
+int varGPS;
+int varGPRS;
+
 void setup() 
-{
+{     
      datosgps.begin(9600);
      Serial.begin(9600);
      //datosrecibidoss.reserve(200);
@@ -22,25 +27,37 @@ void setup()
      //String direccion1= "GET /tutoria/guardar.php?id="+String(bariable1)+"&ib="+String(bariable2)+"&latitud="+latitud+"&longitud="+longitud+" HTTP/1.1\r\nHost:avemeca.000webhostapp.com\r\nConnection: close\r\n\r\n";
     // String direccion1= "GET /tutoria/guardar.php?id="+String(bariable1)+"&ib="+String(bariable2)+"&latitud=23421&longitud=11111 HTTP/1.1\r\nHost:avemeca.000webhostapp.com\r\nConnection: close\r\n\r\n";
      //direccion1.toCharArray(direccion,300 );
-     
+     //String direccion1= "GET /tutoria/guardar.php?latitud="+latitud+"&longitud="+longitud+" HTTP/1.1\r\nHost:avemeca.000webhostapp.com\r\nConnection: close\r\n\r\n";
+            //direccion1.toCharArray(direccion,300 );
 }
 void loop() 
 {  
-Serial.println("iniciando GPS, espere por fabor");
-            GPS_SOL_GPS();
-            Serial.println("latitud:"+latitud);
-            Serial.println("longitud:"+longitud);
-            GPRS_SOL_CONEXION();
+
+           varGPS=1;    
+           //GPRS_Power_on();
+           GPS_SOL_GPS();
+           direccion1= "GET /tutoria/guardar.php?latitud="+latitud+"&longitud="+longitud+" HTTP/1.1\r\nHost:avemeca.000webhostapp.com\r\nConnection: close\r\n\r\n";
+           direccion1.toCharArray(direccion,300 );
+           GPRS_SOL_CONEXION();
+         
 }
 
          void GPRS_SOL_CONEXION()
          {
-         	  Serial.println("Iniciar envio de datos");
-              GPRS_Power_on();
-              GPRS_Conectar();
-              GPRS_PeticionHttp();
-              GPRS_Desconectar();
-
+           Serial.println("Iniciar envio de datos");
+          switch (varGPRS) {
+              case 1:
+                GPRS_Conectar();
+                
+              case 2:
+                GPRS_PeticionHttp();
+                
+              case 3:
+                GPRS_Desconectar();
+                break;
+              default:
+                break;
+          }
          }
          void GPRS_Power_on()
          {
@@ -63,6 +80,7 @@ Serial.println("iniciando GPS, espere por fabor");
                  datosgps.println(respuestaPOn);
                }
              }
+             varGPS=2;
          }
          
          void GPRS_Power_off()
@@ -107,6 +125,7 @@ Serial.println("iniciando GPS, espere por fabor");
                 GPS_EnviarAT("AT+CSTT=\"internet.itelcel.com\",\"webgprs\",\"webgprs2003\"", "OK", 3000); //Definimos el APN, usuario y clave a utilizar
                 GPS_EnviarAT("AT+CIICR", "OK", 3000); //Activamos el perfil de datos inalámbrico
                 GPS_EnviarAT("AT+CIFSR", "", 3000); //Para obtener nuestra direccion IP
+                varGPRS=2;
          }  
          void GPRS_Desconectar()
          {
@@ -114,34 +133,58 @@ Serial.println("iniciando GPS, espere por fabor");
                  Serial.println("Desconectando de la red...");
                  delay (5000);
                 GPS_EnviarAT("AT+CIPCLOSE", "CLOSE OK", 10000); //Cerramos la conexion
-                GPS_EnviarAT("AT+CIPSHUT", "OK", 10000); //Cierra el contexto PDP del GPRS
-                delay(10000);
-               
-                 //Comprobando la conexión a la red
-                 while ( GPS_EnviarAT("AT+CREG?", "+CREG: 0,1", 1000) != 0 )
-                 {
-                 }               
+                while (GPS_EnviarAT("AT+CIPSHUT", "OK", 10000)==0); //Cierra el contexto PDP del GPRS
+                {
+
+                }
+                             
                  Serial.println("Desconectado de la red.");
+                 varGPS=1;
            
-         }               
+         }     
+
+
+
          void GPRS_PeticionHttp()
+         {
+           if (GPS_EnviarAT("AT+CREG?", "+CREG: 0,1", 1000) == 1) //Comprueba la conexion a la red
+           {
+                  GPS_EnviarAT("AT+CIPSTART=\"TCP\",\"avemeca.000webhostapp.com\",\"80\"", "CONNECT OK", 5000); //Inicia una conexión TCP
+                  
+                  //Envíamos datos a través del TCP...
+                   sprintf(aux_str, "AT+CIPSEND=%d", strlen(direccion));
+         
+         
+                   if (GPS_EnviarAT(aux_str, ">", 10000) == 1)
+                   { 
+                          GPS_EnviarAT(direccion, "OK", 10000);
+                    }
+           }
+           varGPRS=2;
+        
+         }
+
+
+
+
+
+
+
+         void GPRS_PeticionHttplll()
          {
                  if (GPS_EnviarAT("AT+CREG?", "+CREG: 0,1", 1000) == 1) //Comprueba la conexion a la red
                  {
                         GPS_EnviarAT("AT+CIPSTART=\"TCP\",\"avemeca.000webhostapp.com\",\"80\"", "CONNECT OK", 5000); //Inicia una conexión TCP
-                        
-                        delay(100);
-               String direccion1= "GET /tutoria/guardar.php?latitud="+latitud+"&longitud="+longitud+" HTTP/1.1\r\nHost:avemeca.000webhostapp.com\r\nConnection: close\r\n\r\n";
-              direccion1.toCharArray(direccion,300 );
-              delay(100);
                         //Envíamos datos a través del TCP...
-                         sprintf(aux_str, "AT+CIPSEND=%d", strlen(direccion));
+                       //  sprintf(aux_str, "AT+CIPSEND=%d", strlen(direccion1));
+                         //sprintf(aux_str, "AT+CIPSEND=%d", direccion1);
                          
                
-                         if (GPS_EnviarAT(aux_str, ">", 10000) == 1)
+                         if (GPS_EnviarAT("AT+CIPSEND",">", 1000) == 1)
                          { 
-                                GPS_EnviarAT(direccion, "OK", 10000);
+                                GPS_EnviarAT(direccion1, "OK", 1000);
                           }
+                     varGPRS=2;
                  }
                 else
                  {
@@ -154,15 +197,33 @@ Serial.println("iniciando GPS, espere por fabor");
 
          void GPS_SOL_GPS()
          {
-             Serial.println("iniciando GPS, espere por fabor");
-             GPRS_Power_on();
-             GPS_Activar_gps();
-             GPS_SOL_Coordenadas ();
-             GPS_Desactivar_gps();
+          Serial.println("iniciando GPS, espere por fabor");
+          switch (varGPS) {
+              case 1:
+                GPRS_Power_on();
+                //break;
+              case 2:
+                GPS_Activar_gps();
+               // break;
+              case 3:
+                GPS_SOL_Coordenadas ();
+               // break;
+              case 4:
+                GPS_Desactivar_gps();
+                break;
+
+              default:
+                break;
+          }
+             
+           //  GPRS_Power_on();
+           //  GPS_Activar_gps();
+           //  GPS_SOL_Coordenadas ();
+           //  GPS_Desactivar_gps();
          }
          void GPS_SOL_Coordenadas()
          {
-            Serial.println("Obteniedo longitud...");  
+            Serial.println("Obteniedo Coordenadas...");  
                datosgps.print("AT+CGPSINF=0");//Solicita las coordenadas
                datosgps.print((char)10);
                datosgps.print((char)13);
@@ -174,11 +235,18 @@ Serial.println("iniciando GPS, espere por fabor");
                delay(5);
                float Flt_Latitud=Str_Latitud.toFloat();delay(20);
                Flt_Latitud=(Flt_Latitud/100)+0.2597827;delay(20);
-               Serial.println("Latitud: "+ GPS_Cv_F_S_Latitud(Flt_Latitud));
+               latitud= GPS_Cv_F_S_Latitud(Flt_Latitud);
+               Serial.println("Latitud: " + latitud);
                float Flt_Longitud=Str_Longitud.toFloat();
                Flt_Longitud=(Flt_Longitud/-100)-0.154547;
-               Serial.println("Longitud: "+ GPS_Cv_F_S_Longitud(Flt_Longitud));
+               longitud=GPS_Cv_F_S_Longitud(Flt_Longitud);
+               Serial.println("Longitud: "+ longitud);
                   }
+                
+                return latitud;
+                return longitud;
+                varGPS=4;
+
          }
            
          void GPS_Activar_gps()
@@ -190,17 +258,19 @@ Serial.println("iniciando GPS, espere por fabor");
               while ( GPS_EnviarAT("AT+CGPSSTATUS?", "+CGPSSTATUS: Location 3D Fix", 1000) == 0 )
               {
               }
+              varGPS=3;
+
          }
          void GPS_Desactivar_gps()
          {
                GPS_EnviarAT("AT+CGPSPWR=0", "OK", 100); //desactivaos el gps
                Serial.println("Desactivando GPS...");
+               GPS_EnviarAT("AT+CGPSSTATUS?", "+CGPSSTATUS: Location Unknown", 1000);
                delay (5000);
+               
                //peguntar sobre el estado del gps para confirmar que se encuentre apagado
-               while ( GPS_EnviarAT("AT+CGPSSTATUS?", "+CGPSSTATUS: Location Unknown", 1000) == 0 )
-               {
-               }
-               delay (5000);
+
+               varGPRS=1;
          }       
          int GPS_EnviarAT(String ATcommand, char* resp_correcta, unsigned int tiempo)
          {
@@ -239,20 +309,20 @@ Serial.println("iniciando GPS, espere por fabor");
          String GPS_Cv_F_S_Longitud( float Flt_Longitud,int l,int d,boolean z)
          {
                 char c[l+1];
-                String s;
+                String slon;
                 dtostrf(Flt_Longitud,l,d,c);
-                s=String(c);
+                slon=String(c);
                 if(z){
-                s.replace(" ","0");
-                }return s;
+                slon.replace(" ","0");
+                }return slon;
          }               
          String GPS_Cv_F_S_Latitud( float Flt_Latitud,int l,int d,boolean z)
          {
                 char c[l+1];
-                String s;
+                String slat;
                 dtostrf(Flt_Latitud,l,d,c);
-                s=String(c);
+                slat=String(c);
                 if(z){
-                s.replace(" ","0");
-                }return s;
+                slat.replace(" ","0");
+                }return slat;
          }
